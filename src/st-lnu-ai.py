@@ -403,6 +403,35 @@ def clean_reply(reply):
     return cleaned_reply.strip()  # Added strip() to remove leading/trailing whitespace
 
 
+def get_env_variable(name, default=None):
+    """
+    Returns the value of the environment variable with the given name.
+    First tries to fetch it from Streamlit secrets, and if not available,
+    falls back to the local environment. If it's not found in either place,
+    returns the default value if provided.
+    
+    Args:
+        name (str): The name of the environment variable.
+        default (str, optional): The default value to be returned in case the environment variable is not found.
+
+    Returns:
+        str: The value of the environment variable, or the default value.
+    """
+    if st.secrets is not None and name in st.secrets:
+        # Fetch the secret from Streamlit secrets
+        return st.secrets[name]
+    else:
+        # Try to get the secret from the local environment
+        value = os.getenv(name)
+
+        if value is None and default is not None:
+            # If the environment variable is not found and a default value is provided,
+            # return the default value
+            return default
+        else:
+            return value
+
+
 @st.cache_resource(show_spinner=False)
 def load_env_variables_and_data():
     """
@@ -442,37 +471,36 @@ def load_env_variables():
     Returns:
     Tuple: A tuple containing the loaded environment variables.
     """
-    load_dotenv()
-
     api_keys = {
-        "openai": os.getenv("OPENAI_API_KEY"),
-        "replicate": os.getenv("REPLICATE_API_TOKEN"),
+        "openai": get_env_variable("OPENAI_API_KEY"),
+        "replicate": get_env_variable("REPLICATE_API_TOKEN"),
     }
 
     tts_settings = {
-        "tts_audio": os.getenv('TTS_AUDIO'),
-        "eleven_labs": os.getenv('ELEVEN_LABS'),
-        "speechki_audio": os.getenv('SPEECHKI_AUDIO'),
-        "local_tts": os.getenv('LOCAL_TTS'),
+        "tts_audio": get_env_variable('TTS_AUDIO'),
+        "eleven_labs": get_env_variable('ELEVEN_LABS'),
+        "speechki_audio": get_env_variable('SPEECHKI_AUDIO'),
+        "local_tts": get_env_variable('LOCAL_TTS'),
     }
 
     local_data_files = {
-        "trained_data": (os.getenv("TRAINED_DATA") + '.jsonl') if os.getenv("TRAINED_DATA") else None,
-        "all_word_details": (os.getenv("ALL_WORD_DETAILS") + '.json') if os.getenv("ALL_WORD_DETAILS") else None,
-        "trained_data_embeddings": (os.getenv("TRAINED_DATA_EMBEDDINGS") + '.json') if os.getenv("TRAINED_DATA_EMBEDDINGS") else None,
-        "word_details_embeddings": (os.getenv("WORD_DETAILS_EMBEDDINGS") + '.json') if os.getenv("WORD_DETAILS_EMBEDDINGS") else None,
+        "trained_data": (get_env_variable("TRAINED_DATA") + '.jsonl') if get_env_variable("TRAINED_DATA") else None,
+        "all_word_details": (get_env_variable("ALL_WORD_DETAILS") + '.json') if get_env_variable("ALL_WORD_DETAILS") else None,
+        "trained_data_embeddings": (get_env_variable("TRAINED_DATA_EMBEDDINGS") + '.json') if get_env_variable("TRAINED_DATA_EMBEDDINGS") else None,
+        "word_details_embeddings": (get_env_variable("WORD_DETAILS_EMBEDDINGS") + '.json') if get_env_variable("WORD_DETAILS_EMBEDDINGS") else None,
     }
 
     models = {
-        "chat_model": os.getenv("CHAT_MODEL_SELECTION", default="gpt-4-0613"),
-        "completion_model": os.getenv("COMPLETION_MODEL_SELECTION", default="text-davinci-003"),
-        "fine_tuned_model_dictionary": os.getenv("FINE_TUNED_MODEL_DICTIONARY"),
-        "fine_tuned_model_data": os.getenv("FINE_TUNED_MODEL_DATA"),
+        "chat_model": get_env_variable("CHAT_MODEL_SELECTION", default="gpt-4-0613"),
+        "completion_model": get_env_variable("COMPLETION_MODEL_SELECTION", default="text-davinci-003"),
+        "fine_tuned_model_dictionary": get_env_variable("FINE_TUNED_MODEL_DICTIONARY"),
+        "fine_tuned_model_data": get_env_variable("FINE_TUNED_MODEL_DATA"),
     }
 
     openai.api_key = api_keys["openai"]
 
     return api_keys, tts_settings, local_data_files, models
+
 
 
 def generate_audio(text, tts_service):
