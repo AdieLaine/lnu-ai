@@ -1,0 +1,3 @@
+[server]
+headless = true
+port = 8501
