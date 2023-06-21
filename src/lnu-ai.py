@@ -521,7 +521,7 @@ def generate_openai_images(prompt, role="DALL-E", context="In the creative and v
     """
     try:
         full_prompt = f"{context} {prompt}"
-        truncated_prompt = full_prompt[:200]
+        truncated_prompt = full_prompt[:300]
         prompt_settings = {
             "model": "image-alpha-001",
             "prompt": truncated_prompt,
@@ -661,7 +661,19 @@ def display_sound_of_words(user_selected_word, all_word_details: dict):
                     st.info("The Spectrogram represents how the frequencies of the audio signal are distributed with respect to time.")
                 
         else:
-            st.write(f"No directory found for the word {user_selected_word} at the expected location: {dir_path}")
+            st.info(f"No directory found for the word {user_selected_word} at the expected location: {dir_path}")
+
+            # filter the words that begin with 'q'
+            q_words = [(word, all_word_details[word]['meanings']) for word in all_word_details.keys() if word[0].lower() == 'q']
+
+            # create a markdown string with words and their meanings as a bullet point list
+            # strip the square brackets and single quotes from meanings
+            q_words_info = '\n'.join([f'- <span style="color:red;">{word}</span>: <span style="color:white;">{str(meanings)[2:-2]}</span>' for word, meanings in q_words])
+
+            st.markdown(f"We have limited the words for to demonstrate the function. These words are available to use:\n{q_words_info}", unsafe_allow_html=True)
+
+
+
             
     else:
         st.error(f"The word {user_selected_word} not found in the database.")
@@ -797,6 +809,7 @@ def generate_word_translations_visualization(embeddings, word_list, all_word_det
     # Calculate cosine similarities and get indices of closest words
     closest_word_indices = np.argsort([calculate_cosine_similarity(embeddings, word_index, i) for i in range(len(word_list))])[::-1]
 
+
     # Define node colors for different edge options
     node_colors = {"translation": "cyan", "part_of_speech": "limegreen", "pronunciation": "red", "meanings": "gold"}
 
@@ -909,8 +922,8 @@ def explore_word_details(selected_word, all_word_details):
         st.markdown(f"<div style='color:CornflowerBlue;'>Translation: </div>{translation}", unsafe_allow_html=True)
 
     st.markdown("<div style='color:CornflowerBlue;'>Meanings:</div>", unsafe_allow_html=True)
-    for meaning in meanings:
-        st.markdown(f"- {meaning}", unsafe_allow_html=True)
+    for meanings in meanings:
+        st.markdown(f"- {meanings}", unsafe_allow_html=True)
 
     st.markdown("<div style='color:CornflowerBlue;'>Example of word used in sentence:</div>", unsafe_allow_html=True)
     for example_line in example:
@@ -954,7 +967,7 @@ def explore_words():
     st.sidebar.info("The Vector Matrix of all Mi'kmaq Words\n\n- Explore New Word Connections\n- See and Hear the Essence of Mi'kmaq Orthography\n- Dive into the Frequency of Mi'kmaq Words\n- What Makes a Word a Word?")
     
     # Display the image in the sidebar
-    search_word = st.sidebar.text_input("Search for a word", value="")
+    search_word = st.sidebar.text_input("Type an English word", value="")
 
     # Instruction text
     st.markdown("""
@@ -1000,13 +1013,20 @@ def explore_words():
     # Generate word list and transform data to DataFrame
     word_list = list(all_word_details.keys())
     df = pd.DataFrame([(key, value["translation"], value["meanings"], value["example"]) for key, value in all_word_details.items()],
-                    columns=["word", "translation", "meanings", "example"])
+                        columns=["word", "translation", "meanings", "example"])
+
+    # Sort the DataFrame by 'word' column in ascending order
+    df = df.sort_values(by=['word'])
+
+    # Resetting the index
+    df = df.reset_index(drop=True)
 
     similar_words = None
     selected_word = ""
     user_selected_word = ""
 
-    if search_word:  # Check if a search_word has been entered
+    # Check if a search_word has been entered
+    if search_word:  
         search_word_lower = search_word.lower()
 
         # Find the exact match in the "translation" field where the searched word is the first word
@@ -1016,18 +1036,25 @@ def explore_words():
             selected_word = exact_match_translation[0]
         else:
             # Find the word in the "meanings" field where the searched word is present
-            similar_words_meanings = df[df['meanings'].apply(lambda meanings: any(search_word_lower in meaning.lower().split() for meaning in meanings))]['word'].values
+            similar_words_meanings = df[df['meanings'].apply(lambda meanings: any(search_word_lower in meanings.lower().split() for meanings in meanings))]['word'].values
             if len(similar_words_meanings) > 0:
                 selected_word = similar_words_meanings[0]
 
         if not selected_word:
             st.sidebar.write("No similar word found.")
-
+        
         if selected_word:
-            # Find the next match starting with the first letter of the selected word
-            next_match = df[df['word'].str.startswith(selected_word[0])]['word'].values[1:21]
-            combined_words = np.concatenate(([selected_word], next_match))
+            # Get index of the selected word in dataframe
+            selected_word_index = df.index[df['word'] == selected_word].tolist()[0]
+
+            # Get next 19 words after the selected word
+            next_words = df.iloc[selected_word_index+1 : selected_word_index+20]['word'].values
+
+            # Combine the selected word with next 19 words
+            combined_words = np.concatenate(([selected_word], next_words))
+
             user_selected_word = st.sidebar.selectbox("Similar words:", combined_words)
+
 
     visual_option = st.sidebar.selectbox("Select a method to explore", ("Word Visualization", "Sound of Words"))
 
@@ -1226,8 +1253,8 @@ def display_word_details_chatbot(selected_word, all_word_detail: dict):
 
     # Display meanings
     st.markdown("<div style='color:CornflowerBlue;'>Meanings:</div>", unsafe_allow_html=True)
-    for meaning in meanings:
-        st.markdown(f"- {meaning}", unsafe_allow_html=True)
+    for meanings in meanings:
+        st.markdown(f"- {meanings}", unsafe_allow_html=True)
     st.sidebar.markdown("---")
 
 
@@ -1310,15 +1337,21 @@ def chatbot_application(models, trained_data: dict, local_data_files: dict, tts_
 
     # Generate word list and transform data to DataFrame
     word_list = list(all_word_details.keys())
-    df = pd.DataFrame(
-        [(key, value["translation"], value["meanings"], value["example"]) for key, value in all_word_details.items()],
-        columns=["word", "translation", "meanings", "example"]
-    )
+    df = pd.DataFrame([(key, value["translation"], value["meanings"], value["example"]) for key, value in all_word_details.items()],
+                        columns=["word", "translation", "meanings", "example"])
+
+    # Sort the DataFrame by 'word' column in ascending order
+    df = df.sort_values(by=['word'])
+
+    # Resetting the index
+    df = df.reset_index(drop=True)
+
     similar_words = None
     selected_word = ""
     user_selected_word = ""
 
-    if search_word:
+    # Check if a search_word has been entered
+    if search_word:  
         search_word_lower = search_word.lower()
 
         # Find the exact match in the "translation" field where the searched word is the first word
@@ -1328,17 +1361,23 @@ def chatbot_application(models, trained_data: dict, local_data_files: dict, tts_
             selected_word = exact_match_translation[0]
         else:
             # Find the word in the "meanings" field where the searched word is present
-            similar_words_meanings = df[df['meanings'].apply(lambda meanings: any(search_word_lower in meaning.lower().split() for meaning in meanings))]['word'].values
+            similar_words_meanings = df[df['meanings'].apply(lambda meanings: any(search_word_lower in meanings.lower().split() for meanings in meanings))]['word'].values
             if len(similar_words_meanings) > 0:
                 selected_word = similar_words_meanings[0]
 
         if not selected_word:
             st.sidebar.write("No similar word found.")
-
+        
         if selected_word:
-            # Find the next match starting with the first letter of the selected word
-            next_match = df[df['word'].str.startswith(selected_word[0])]['word'].values[1:21]
-            combined_words = np.concatenate(([selected_word], next_match))
+            # Get index of the selected word in dataframe
+            selected_word_index = df.index[df['word'] == selected_word].tolist()[0]
+
+            # Get next 19 words after the selected word
+            next_words = df.iloc[selected_word_index+1 : selected_word_index+20]['word'].values
+
+            # Combine the selected word with next 19 words
+            combined_words = np.concatenate(([selected_word], next_words))
+
             user_selected_word = st.sidebar.selectbox("Similar words:", combined_words)
 
     # Display word details in sidebar
@@ -1581,9 +1620,20 @@ def main_application(global_vars: dict) -> None:
     # Generate word list and transform data to DataFrame
     word_list = list(all_word_details.keys())
     df = pd.DataFrame([(key, value["translation"], value["meanings"], value["example"]) for key, value in all_word_details.items()],
-                    columns=["word", "translation", "meanings", "example"])
+                        columns=["word", "translation", "meanings", "example"])
 
-    if search_word:  # Check if a search_word has been entered
+    # Sort the DataFrame by 'word' column in ascending order
+    df = df.sort_values(by=['word'])
+
+    # Resetting the index
+    df = df.reset_index(drop=True)
+
+    similar_words = None
+    selected_word = ""
+    user_selected_word = ""
+
+    # Check if a search_word has been entered
+    if search_word:  
         search_word_lower = search_word.lower()
 
         # Find the exact match in the "translation" field where the searched word is the first word
@@ -1593,18 +1643,24 @@ def main_application(global_vars: dict) -> None:
             selected_word = exact_match_translation[0]
         else:
             # Find the word in the "meanings" field where the searched word is present
-            similar_words_meanings = df[df['meanings'].apply(lambda meanings: any(search_word_lower in meaning.lower().split() for meaning in meanings))]['word'].values
+            similar_words_meanings = df[df['meanings'].apply(lambda meanings: any(search_word_lower in meanings.lower().split() for meanings in meanings))]['word'].values
             if len(similar_words_meanings) > 0:
                 selected_word = similar_words_meanings[0]
 
         if not selected_word:
             st.sidebar.write("No similar word found.")
-
+        
         if selected_word:
-            # Find the next match starting with the first letter of the selected word
-            next_match = df[df['word'].str.startswith(selected_word[0])]['word'].values[1:21]
-            combined_words = np.concatenate(([selected_word], next_match))
-            selected_word = st.sidebar.selectbox("Similar words:", combined_words)
+            # Get index of the selected word in dataframe
+            selected_word_index = df.index[df['word'] == selected_word].tolist()[0]
+
+            # Get next 19 words after the selected word
+            next_words = df.iloc[selected_word_index+1 : selected_word_index+20]['word'].values
+
+            # Combine the selected word with next 19 words
+            combined_words = np.concatenate(([selected_word], next_words))
+
+            user_selected_word = st.sidebar.selectbox("Similar words:", combined_words)
 
     # Display word details in sidebar
     if selected_word:
@@ -1895,8 +1951,8 @@ def display_word_details_main(selected_word: str, all_word_details: dict, tts_se
     # Display meanings
     meanings = word_detail.get('meanings', [])
     sidebar.markdown("Meanings:")  # changed to sidebar
-    for meaning in meanings:
-        sidebar.markdown(f"- {meaning}")  # changed to sidebar
+    for meanings in meanings:
+        sidebar.markdown(f"- {meanings}")  # changed to sidebar
 
     # Display example sentences
     example_sentences = word_detail.get('example', [])
