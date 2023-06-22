@@ -3,6 +3,15 @@
 This directory contains various data files that are crucial to the functioning of the Lnu-AI system. The datasets are utilized in multiple features such as language translation, semantic analysis, and the chat system. Below is a brief explanation of each file and its role within the system.
 
 
+# Downloading the Data Files
+
+If you are looking for trained_data_embeddings.json and word_details_embeddings.json for the project, they are are stored in a Google Drive folder. You can access the folder [here](https://drive.google.com/drive/folders/1XvBdEu7kn9vr7bn3eJOUuLPeEK4x-DY4?usp=drive_link).
+
+Simply download the folder and place it in the root directory of the project. The project will automatically detect the folder and use the data files. Be sure to check the Readme file in the folder for more information.
+
+
+---
+
 ## Embedded Mi'kmaq Language Corpus
 
 - **all_word_details.json**: This file contains comprehensive details for each word in the Mi'kmaq language, including translation, orthographic variants, pronunciation, and semantic relationships with other words.
